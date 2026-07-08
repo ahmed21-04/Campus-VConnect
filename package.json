@@ -1,0 +1,15 @@
+{
+  "name": "campus-connect",
+  "version": "1.0.0",
+  "description": "Full college/school education platform - auth, departments, semesters, subjects, notes, PYQs, attendance, calendar, performance, avatars",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "bcryptjs": "^2.4.3"
+  }
+}
