@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Campus Connect — Chat</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">Doubts &amp; Questions</span>
+      <h1 id="chatTitle">Chat</h1>
+      <div id="chatSub" style="color:var(--muted);font-size:14px"></div>
+    </div>
+
+    <div class="chat-layout">
+      <div class="chat-contacts" id="contactList">
+        <div class="empty-state" style="margin:14px">Loading…</div>
+      </div>
+      <div class="chat-thread" id="chatThread">
+        <div class="chat-empty" id="chatEmpty">
+          <i class="fa-solid fa-comments"></i>
+          <div id="chatEmptyText">Select a person on the left to start chatting.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let activeId = null;
+    let pollTimer = null;
+    let lastMsgId = null;
+
+    const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const fmtTime = (iso) => {
+      const d = new Date(iso), now = new Date();
+      const t = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      return d.toDateString() === now.toDateString() ? t : d.toLocaleDateString([], {day:'numeric', month:'short'}) + ' ' + t;
+    };
+
+    async function loadContacts() {
+      const { contacts } = await api('/chat/contacts');
+      const list = document.getElementById('contactList');
+      if (!contacts.length) {
+        list.innerHTML = '<div class="empty-state" style="margin:14px">No one to chat with yet.</div>';
+        return;
+      }
+      list.innerHTML = contacts.map(c => `
+        <div class="chat-contact ${c.id === activeId ? 'active' : ''}" data-id="${c.id}" data-name="${esc(c.name)}" data-role="${c.role}">
+          ${profilePicHtml(c, 38)}
+          <div style="min-width:0">
+            <div class="chat-contact-name">${esc(c.name)}</div>
+            <div class="chat-contact-sub">${c.lastMessage ? (c.lastMessage.fromMe ? 'You: ' : '') + esc(c.lastMessage.text) : (c.role === 'student' ? 'Student' : c.role === 'admin' ? 'Administrator' : 'Teacher')}</div>
+          </div>
+          ${c.unread ? `<div class="chat-unread">${c.unread}</div>` : ''}
+        </div>`).join('');
+      list.querySelectorAll('.chat-contact').forEach(el => {
+        el.onclick = () => openThread(el.dataset.id, el.dataset.name, el.dataset.role);
+      });
+    }
+
+    function renderMessages(messages) {
+      const box = document.getElementById('chatMsgs');
+      if (!box) return;
+      const newLast = messages.length ? messages[messages.length - 1].id : null;
+      if (newLast === lastMsgId) return; // nothing new
+      lastMsgId = newLast;
+      box.innerHTML = messages.length ? messages.map(m => `
+        <div class="chat-bubble ${m.fromUserId === CURRENT_USER.id ? 'mine' : 'theirs'}">
+          ${esc(m.text)}
+          <div class="chat-time">${fmtTime(m.time)}</div>
+        </div>`).join('')
+        : '<div style="text-align:center;color:var(--muted);font-size:13px;margin:auto">No messages yet — ask your first question!</div>';
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function refreshThread() {
+      if (!activeId) return;
+      try {
+        const { messages } = await api('/chat/messages/' + activeId);
+        renderMessages(messages);
+      } catch(_) {}
+    }
+
+    async function openThread(id, name, role) {
+      activeId = id;
+      lastMsgId = null;
+      document.querySelectorAll('.chat-contact').forEach(el =>
+        el.classList.toggle('active', el.dataset.id === id));
+
+      const roleLabel = role === 'student' ? 'Student' : role === 'admin' ? 'Administrator' : 'Teacher';
+      document.getElementById('chatThread').innerHTML = `
+        <div class="chat-thread-head">
+          <div id="threadPic"></div>
+          <div>
+            <div class="chat-contact-name">${esc(name)}</div>
+            <div class="chat-contact-sub">${roleLabel}</div>
+          </div>
+        </div>
+        <div class="chat-msgs" id="chatMsgs"></div>
+        <div class="chat-input-row">
+          <textarea id="msgInput" rows="1" placeholder="${CURRENT_USER.role === 'student' ? 'Ask a doubt or a chapter question…' : 'Type a reply…'}"></textarea>
+          <button class="btn btn-brass" id="sendBtn"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>`;
+
+      await refreshThread();
+      loadContacts(); // refresh unread counts
+
+      const input = document.getElementById('msgInput');
+      const send = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        try {
+          await api('/chat/messages', { method: 'POST', body: { toUserId: activeId, text } });
+          await refreshThread();
+          loadContacts();
+        } catch(err) { alert(err.message); }
+      };
+      document.getElementById('sendBtn').onclick = send;
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+      });
+      input.focus();
+
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(refreshThread, 3500);
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('chat');
+
+      if (user.role === 'student') {
+        document.getElementById('chatTitle').textContent = 'Chat with your teachers';
+        document.getElementById('chatSub').textContent = 'Ask doubts and questions about chapters — your teachers will reply here.';
+        document.getElementById('chatEmptyText').textContent = 'Select a teacher on the left to ask a doubt.';
+      } else {
+        document.getElementById('chatTitle').textContent = 'Student chat';
+        document.getElementById('chatSub').textContent = 'Answer student doubts and chapter questions.';
+        document.getElementById('chatEmptyText').textContent = 'Select a student on the left to view their questions.';
+      }
+
+      await loadContacts();
+      setInterval(loadContacts, 10000); // keep contact list / unread counts fresh
+    })();
+  </script>
+</body>
+</html>

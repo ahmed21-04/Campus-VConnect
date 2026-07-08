@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Students — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow"><i class="fa-solid fa-user-graduate"></i> &nbsp;Directory</span>
+      <h1>Students</h1>
+      <div id="countLine" style="color:rgba(35,36,31,0.6);font-size:14px">Manage student records.</div>
+    </div>
+
+    <div class="card" id="addCard" style="margin-bottom:18px">
+      <h3 style="font-size:15px;margin-bottom:12px" id="formTitle">Add a student</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <div class="field" style="margin:0"><label>Full name</label><input type="text" id="fName"></div>
+        <div class="field" style="margin:0"><label>Email</label><input type="email" id="fEmail"></div>
+        <div class="field" style="margin:0"><label>Password</label><input type="text" id="fPass" placeholder="Set login password"></div>
+        <div class="field" style="margin:0"><label>Department</label><select id="fDept"></select></div>
+        <div class="field" style="margin:0"><label>Semester</label>
+          <select id="fSem">${[1,2,3,4,5,6,7,8].map(n=>`<option value="${n}">${n}</option>`).join('')}</select>
+        </div>
+        <div class="field" style="margin:0"><label>Phone</label><input type="text" id="fPhone"></div>
+        <button class="btn btn-brass" id="saveBtn">Add</button>
+        <button class="btn btn-outline" id="cancelBtn" style="display:none">Cancel</button>
+      </div>
+      <div id="msg" style="margin-top:10px;font-size:13px"></div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Sem</th><th>Phone</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let editingId = null;
+    let depts = [];
+    const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const deptName = (id) => { const d = depts.find(x=>x.id===id); return d ? d.name : '—'; };
+
+    async function loadStudents() {
+      const { users } = await api('/users?role=student');
+      document.getElementById('countLine').textContent = `${users.length} registered student${users.length===1?'':'s'}.`;
+      document.getElementById('rows').innerHTML = users.length ? users.map(u => `
+        <tr>
+          <td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(deptName(u.departmentId))}</td>
+          <td>${u.semesterNumber||'—'}</td><td>${esc(u.phone||'—')}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-outline btn-sm" onclick='startEdit(${JSON.stringify(u)})'>Edit</button>
+            <button class="btn btn-outline btn-sm" onclick="removeStudent('${u.id}', ${JSON.stringify(u.name).replace(/"/g,'&quot;')})">Remove</button>
+          </td>
+        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:rgba(35,36,31,0.5)">No students yet</td></tr>`;
+    }
+
+    function resetForm() {
+      editingId = null;
+      document.getElementById('formTitle').textContent = 'Add a student';
+      document.getElementById('saveBtn').textContent = 'Add';
+      document.getElementById('cancelBtn').style.display = 'none';
+      ['fName','fEmail','fPass','fPhone'].forEach(i=>document.getElementById(i).value='');
+      document.getElementById('fPass').placeholder = 'Set login password';
+      document.getElementById('msg').textContent = '';
+    }
+
+    function startEdit(u) {
+      editingId = u.id;
+      document.getElementById('formTitle').textContent = 'Edit student';
+      document.getElementById('saveBtn').textContent = 'Save changes';
+      document.getElementById('cancelBtn').style.display = 'inline-block';
+      document.getElementById('fName').value = u.name || '';
+      document.getElementById('fEmail').value = u.email || '';
+      document.getElementById('fPass').value = '';
+      document.getElementById('fPass').placeholder = 'Leave blank to keep current';
+      document.getElementById('fDept').value = u.departmentId || '';
+      document.getElementById('fSem').value = u.semesterNumber || 1;
+      document.getElementById('fPhone').value = u.phone || '';
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    async function removeStudent(id, name) {
+      if (!confirm(`Remove student "${name}"?`)) return;
+      await api(`/users/${id}`, { method: 'DELETE' });
+      loadStudents();
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      if (user.role !== 'admin') { window.location.href = '/dashboard.html'; return; }
+      renderNav('');
+
+      const res = await api('/departments'); depts = res.departments;
+      document.getElementById('fDept').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+      await loadStudents();
+
+      document.getElementById('cancelBtn').onclick = resetForm;
+      document.getElementById('saveBtn').onclick = async () => {
+        const msg = document.getElementById('msg');
+        const name = document.getElementById('fName').value.trim();
+        const email = document.getElementById('fEmail').value.trim();
+        const password = document.getElementById('fPass').value;
+        const departmentId = document.getElementById('fDept').value;
+        const semesterNumber = document.getElementById('fSem').value;
+        const phone = document.getElementById('fPhone').value.trim();
+        try {
+          if (editingId) {
+            await api(`/users/${editingId}`, { method: 'PUT', body: { name, email, departmentId, semesterNumber, phone, ...(password ? { password } : {}) } });
+          } else {
+            if (!name || !email || !password) { msg.style.color='var(--danger)'; msg.textContent='Name, email and password are required.'; return; }
+            await api('/users', { method: 'POST', body: { name, email, password, role: 'student', departmentId, semesterNumber, phone } });
+          }
+          resetForm();
+          loadStudents();
+        } catch (e) { msg.style.color='var(--danger)'; msg.textContent = e.message; }
+      };
+    })();
+  </script>
+</body>
+</html>

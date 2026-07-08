@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Campus Connect — Home</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow" id="dateLine"></span>
+      <h1 id="greeting"></h1>
+      <div id="roleSub" style="color:rgba(15,23,42,0.55);font-size:14px"></div>
+    </div>
+
+    <div class="stat-row" id="statRow"></div>
+
+    <!-- STUDENT VIEW -->
+    <div id="studentView" style="display:none">
+      <!-- Today's goals card -->
+      <div class="card">
+        <h3 style="margin-bottom:4px;font-size:16px"><i class="fa-solid fa-bullseye" style="color:var(--brass);margin-right:8px"></i>My Department</h3>
+        <div id="deptBanner" style="color:rgba(15,23,42,0.55);font-size:13px;margin-bottom:16px"></div>
+        <div id="goalRows"></div>
+      </div>
+
+      <!-- Current semester subjects -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <h3 style="font-size:16px;margin:0"><i class="fa-solid fa-book-open" style="color:var(--brass);margin-right:8px"></i>Semester <span id="semLabel"></span> — My Subjects</h3>
+          <a id="semLink" href="#" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-right"></i> All semesters</a>
+        </div>
+        <div class="index-card-list" id="mySubjects">
+          <div class="empty-state">Loading subjects…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAFF / ADMIN VIEW -->
+    <div id="staffView" style="display:none">
+      <div class="card">
+        <h3 style="margin-bottom:14px;font-size:16px"><i class="fa-solid fa-compass" style="color:var(--brass);margin-right:8px"></i>Quick links</h3>
+        <div class="plaque-grid" id="quickLinks" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-logo"><div class="footer-seal">CC</div><span class="footer-brand-name">Campus Connect</span></div>
+        <p>A modern academic management platform for students, teachers, and administrators.</p>
+        <div class="footer-social">
+          <a href="https://facebook.com" target="_blank" rel="noopener" title="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+          <a href="https://instagram.com" target="_blank" rel="noopener" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="https://twitter.com" target="_blank" rel="noopener" title="Twitter / X"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="https://wa.me/919000000000" target="_blank" rel="noopener" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+          <a href="mailto:info@campusconnect.edu" title="Email"><i class="fa-solid fa-envelope"></i></a>
+          <a href="tel:+919000000000" title="Phone"><i class="fa-solid fa-phone"></i></a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Academic</h4>
+        <ul>
+          <li><a href="/attendance.html"><i class="fa-solid fa-calendar-check" style="margin-right:7px;color:var(--brass-light)"></i>Attendance</a></li>
+          <li><a href="/performance.html"><i class="fa-solid fa-chart-bar" style="margin-right:7px;color:var(--brass-light)"></i>Performance</a></li>
+          <li><a href="/calendar.html"><i class="fa-solid fa-calendar-days" style="margin-right:7px;color:var(--brass-light)"></i>Calendar</a></li>
+          <li><a href="/guidelines.html"><i class="fa-solid fa-shield-halved" style="margin-right:7px;color:var(--brass-light)"></i>Guidelines</a></li>
+        </ul>
+      </div>
+      <div class="footer-col"><h4>&nbsp;</h4></div>
+      <div class="footer-col">
+        <h4>Contact Us</h4>
+        <div class="footer-contact-item"><i class="fa-solid fa-location-dot"></i><span>123 College Road, City — 400001</span></div>
+        <div class="footer-contact-item"><i class="fa-solid fa-phone"></i><a href="tel:+919000000000">+91 90000 00000</a></div>
+        <div class="footer-contact-item"><i class="fa-solid fa-envelope"></i><a href="mailto:info@campusconnect.edu">info@campusconnect.edu</a></div>
+        <div class="footer-contact-item"><i class="fa-brands fa-whatsapp"></i><a href="https://wa.me/919000000000" target="_blank" rel="noopener">WhatsApp us</a></div>
+      </div>
+    </div>
+    <hr class="footer-divider">
+    <div class="footer-bottom"><span>&copy; 2024 Campus Connect. All rights reserved.</span></div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('home');
+
+      document.getElementById('dateLine').textContent = new Date().toLocaleDateString(undefined, {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+      document.getElementById('greeting').textContent = user.name;
+
+      if (user.role === 'student') {
+        document.getElementById('studentView').style.display = 'block';
+        document.getElementById('roleSub').textContent = `Student · Semester ${user.semesterNumber || '—'}`;
+
+        // Stats
+        document.getElementById('statRow').innerHTML = `
+          <div class="stat-box"><div class="stat-num">Student</div><div class="stat-label">Role</div></div>
+          <a class="stat-box" href="/attendance.html" style="text-decoration:none"><div class="stat-num" style="font-size:18px">Attendance</div><div class="stat-label">View my records →</div></a>
+          <a class="stat-box" href="/performance.html" style="text-decoration:none"><div class="stat-num" style="font-size:18px">Performance</div><div class="stat-label">View my grades →</div></a>`;
+
+        // Department info
+        const { departments } = await api('/departments');
+        const myDept = departments.find(d => d.id === user.departmentId);
+        document.getElementById('deptBanner').textContent = myDept ? `${myDept.name} · Semester ${user.semesterNumber}` : 'Department not set';
+
+        // Goal rows
+        document.getElementById('goalRows').innerHTML = `
+          <div class="goal-row">
+            <div class="goal-icon"><i class="fa-solid fa-building-columns"></i></div>
+            <div class="goal-label">${myDept ? myDept.name : 'Your department'}</div>
+            <a href="/departments.html" class="btn btn-outline btn-sm">View</a>
+          </div>
+          <div class="goal-row">
+            <div class="goal-icon"><i class="fa-solid fa-layer-group"></i></div>
+            <div class="goal-label">Current semester: <strong>${user.semesterNumber || '—'}</strong></div>
+            <a href="/semesters.html?dept=${user.departmentId}" class="btn btn-outline btn-sm">View all</a>
+          </div>
+          <div class="goal-row">
+            <div class="goal-icon"><i class="fa-solid fa-calendar-check"></i></div>
+            <div class="goal-label">Attendance records</div>
+            <a href="/attendance.html" class="btn btn-outline btn-sm">View</a>
+          </div>
+          <div class="goal-row">
+            <div class="goal-icon"><i class="fa-solid fa-chart-bar"></i></div>
+            <div class="goal-label">Performance &amp; grades</div>
+            <a href="/performance.html" class="btn btn-outline btn-sm">View</a>
+          </div>
+          <div class="goal-row">
+            <div class="goal-icon"><i class="fa-solid fa-comments"></i></div>
+            <div class="goal-label">Chat with teachers — doubts &amp; chapter questions</div>
+            <a href="/chat.html" class="btn btn-outline btn-sm">Open chat</a>
+          </div>`;
+
+        // Load current semester subjects
+        document.getElementById('semLabel').textContent = user.semesterNumber || '—';
+        document.getElementById('semLink').href = `/semesters.html?dept=${user.departmentId}`;
+        if (myDept && user.departmentId) {
+          try {
+            const { semesters } = await api(`/departments/${user.departmentId}/semesters`);
+            const curSem = semesters.find(s => s.number === user.semesterNumber);
+            if (curSem) {
+              const { subjects } = await api(`/semesters/${curSem.id}/subjects`);
+              if (subjects.length) {
+                document.getElementById('mySubjects').innerHTML = subjects.map(s => `
+                  <a class="index-card" href="/subject.html?id=${s.id}">
+                    <div><div class="subj-name">${s.name}</div>
+                    <div class="subj-meta">${s.noteCount} notes · ${s.pyqCount} PYQs ${s.classLink ? '· class link' : ''}</div></div>
+                    <div class="chevron">›</div>
+                  </a>`).join('');
+              } else {
+                document.getElementById('mySubjects').innerHTML = '<div class="empty-state">No subjects added yet for this semester.</div>';
+              }
+            }
+          } catch(_) {}
+        }
+
+      } else {
+        // Teacher / Admin view
+        document.getElementById('staffView').style.display = 'block';
+        document.getElementById('roleSub').textContent = user.role === 'teacher' ? 'Faculty' : 'Administrator';
+
+        const isAdmin = user.role === 'admin';
+        document.getElementById('statRow').innerHTML = `
+          <div class="stat-box"><div class="stat-num">${user.role === 'teacher' ? 'Faculty' : 'Admin'}</div><div class="stat-label">Role</div></div>
+          <a class="stat-box" href="/attendance.html" style="text-decoration:none"><div class="stat-num" style="font-size:18px">Attendance</div><div class="stat-label">Mark records →</div></a>
+          <a class="stat-box" href="/performance.html" style="text-decoration:none"><div class="stat-num" style="font-size:18px">Performance</div><div class="stat-label">Enter grades →</div></a>
+          ${isAdmin ? '<a class="stat-box" href="/admin.html" style="text-decoration:none"><div class="stat-num" style="font-size:18px">Admin</div><div class="stat-label">Management panel →</div></a>' : ''}`;
+
+        const links = [
+          {href:'/departments.html', icon:'fa-sitemap',       label:'Departments & Subjects'},
+          {href:'/calendar.html',    icon:'fa-calendar-days', label:'Academic Calendar'},
+          {href:'/attendance.html',  icon:'fa-calendar-check',label:'Attendance'},
+          {href:'/performance.html', icon:'fa-chart-bar',     label:'Performance'},
+          {href:'/guidelines.html',  icon:'fa-shield-halved', label:'College Guidelines'},
+          {href:'/chat.html',        icon:'fa-comments',      label:'Student Chat'},
+        ];
+        if (isAdmin) links.push({href:'/admin.html', icon:'fa-screwdriver-wrench', label:'Admin Panel'});
+        document.getElementById('quickLinks').innerHTML = links.map((l,i) => `
+          <a class="plaque" href="${l.href}">
+            <div class="plaque-code"><i class="fa-solid ${l.icon}"></i></div>
+            <h3 style="font-size:15px">${l.label}</h3>
+          </a>`).join('');
+      }
+    })();
+  </script>
+</body>
+</html>

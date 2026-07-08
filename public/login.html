@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campus Connect — Log in</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="auth-page">
+
+    <!-- Left visual panel -->
+    <div class="auth-visual">
+      <img src="https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?w=900&auto=format&fit=crop&q=80" alt="College campus building">
+      <div class="auth-visual-overlay">
+        <div class="auth-visual-badges">
+          <span class="auth-badge"><i class="fa-solid fa-graduation-cap"></i> &nbsp;Est. 2024</span>
+          <span class="auth-badge"><i class="fa-solid fa-users"></i> &nbsp;2,400+ Students</span>
+          <span class="auth-badge"><i class="fa-solid fa-building-columns"></i> &nbsp;12 Departments</span>
+        </div>
+        <h2>Welcome back to<br>Campus Connect</h2>
+        <p>Your attendance records, grades, subject resources, and academic calendar — all in one place. Log in to pick up where you left off.</p>
+      </div>
+    </div>
+
+    <!-- Right form panel -->
+    <div class="auth-form-side">
+      <div class="auth-card">
+        <div class="seal">CC</div>
+        <div class="auth-title">Welcome back</div>
+        <div class="auth-sub">Log in to Campus Connect</div>
+
+        <div id="errorBox" class="error-banner" style="display:none"></div>
+
+        <form id="loginForm">
+          <div class="field">
+            <label><i class="fa-solid fa-envelope" style="margin-right:6px;color:var(--brass)"></i>Email</label>
+            <input type="email" id="email" required placeholder="you@campus.edu">
+          </div>
+          <div class="field">
+            <label><i class="fa-solid fa-lock" style="margin-right:6px;color:var(--brass)"></i>Password</label>
+            <input type="password" id="password" required placeholder="••••••••">
+          </div>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Log in</button>
+        </form>
+
+        <div class="auth-switch">New here? <a href="/register.html">Create an account</a></div>
+
+        <div class="demo-hint">
+          <strong>Demo logins</strong><br>
+          <i class="fa-solid fa-user-shield" style="color:var(--brass)"></i> Admin: admin@campus.edu / admin123 &nbsp;·&nbsp;
+          <i class="fa-solid fa-chalkboard-teacher" style="color:var(--brass)"></i> Teacher: teacher@campus.edu / teacher123 &nbsp;·&nbsp;
+          <i class="fa-solid fa-user-graduate" style="color:var(--brass)"></i> Student: student@campus.edu / student123
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('errorBox');
+      errorBox.style.display = 'none';
+      try {
+        await api('/auth/login', {
+          method: 'POST',
+          body: { email: document.getElementById('email').value, password: document.getElementById('password').value }
+        });
+        window.location.href = '/dashboard.html';
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+    renderFooter();
+  </script>
+</body>
+</html>

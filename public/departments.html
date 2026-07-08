@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Departments — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow"><i class="fa-solid fa-sitemap"></i> &nbsp;Directory</span>
+      <h1 id="pageTitle">Departments</h1>
+      <div id="pageDesc" style="color:rgba(15,23,42,0.55);font-size:14px">Browse departments and their subjects.</div>
+    </div>
+    <div class="plaque-grid" id="deptGrid"></div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('departments');
+
+      const { departments } = await api('/departments');
+
+      // Students go straight to their own department's semesters
+      if (user.role === 'student') {
+        const myDept = departments.find(d => d.id === user.departmentId);
+        if (myDept) {
+          // Show only their department — no need to browse all
+          document.getElementById('pageTitle').textContent = myDept.name;
+          document.getElementById('pageDesc').textContent = 'Your department — choose a semester to explore subjects.';
+          document.getElementById('deptGrid').innerHTML = `
+            <a class="plaque" data-code="${myDept.code}" href="/semesters.html?dept=${myDept.id}">
+              <div class="plaque-code"><i class="fa-solid fa-building-columns"></i></div>
+              <h3>${myDept.name}</h3>
+              <div class="plaque-meta"><i class="fa-solid fa-layer-group" style="margin-right:5px;color:var(--blue-500)"></i>8 semesters</div>
+            </a>
+          `;
+          return;
+        }
+      }
+
+      // Teachers and admins see all departments
+      document.getElementById('deptGrid').innerHTML = departments.map(d => `
+        <a class="plaque" data-code="${d.code}" href="/semesters.html?dept=${d.id}">
+          <div class="plaque-code">${d.code}</div>
+          <h3>${d.name}</h3>
+          <div class="plaque-meta"><i class="fa-solid fa-layer-group" style="margin-right:5px;color:var(--blue-500)"></i>8 semesters</div>
+        </a>
+      `).join('');
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Professors — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow"><i class="fa-solid fa-chalkboard-user"></i> &nbsp;Faculty</span>
+      <h1>Professors</h1>
+      <div id="countLine" style="color:rgba(35,36,31,0.6);font-size:14px">Faculty directory and the classes they teach.</div>
+    </div>
+
+    <div class="card" id="addCard" style="display:none;margin-bottom:18px">
+      <h3 style="font-size:15px;margin-bottom:12px" id="formTitle">Add a professor</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <div class="field" style="margin:0"><label>Full name</label><input type="text" id="fName"></div>
+        <div class="field" style="margin:0"><label>Email</label><input type="email" id="fEmail"></div>
+        <div class="field" style="margin:0"><label>Password</label><input type="text" id="fPass" placeholder="Set login password"></div>
+        <div class="field" style="margin:0"><label>Department</label><select id="fDept"></select></div>
+        <div class="field" style="margin:0"><label>Classes taught</label><input type="text" id="fTeaches" placeholder="e.g. DBMS, OS (Sem 3)"></div>
+        <div class="field" style="margin:0"><label>Phone</label><input type="text" id="fPhone"></div>
+        <button class="btn btn-brass" id="saveBtn">Add</button>
+        <button class="btn btn-outline" id="cancelBtn" style="display:none">Cancel</button>
+      </div>
+      <div id="msg" style="margin-top:10px;font-size:13px"></div>
+    </div>
+
+    <div class="plaque-grid" id="grid"></div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let isAdmin = false, editingId = null, depts = [];
+    const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    async function loadTeachers() {
+      const { teachers } = await api('/teachers');
+      document.getElementById('countLine').textContent = `${teachers.length} professor${teachers.length===1?'':'s'} on faculty.`;
+      document.getElementById('grid').innerHTML = teachers.length ? teachers.map(t => `
+        <div class="card" style="margin:0">
+          <h3 style="font-size:16px;margin-bottom:4px">${esc(t.name)}</h3>
+          <div style="font-size:13px;color:rgba(35,36,31,0.7);line-height:1.8">
+            <div><i class="fa-solid fa-envelope" style="color:var(--brass);width:16px"></i> ${esc(t.email)}</div>
+            <div><i class="fa-solid fa-building-columns" style="color:var(--brass);width:16px"></i> ${esc(t.departmentName||'—')}</div>
+            <div><i class="fa-solid fa-book" style="color:var(--brass);width:16px"></i> ${esc(t.teaches||'—')}</div>
+            ${t.phone ? `<div><i class="fa-solid fa-phone" style="color:var(--brass);width:16px"></i> ${esc(t.phone)}</div>` : ''}
+          </div>
+          ${isAdmin ? `<div style="margin-top:10px;display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick='startEdit(${JSON.stringify(t)})'>Edit</button>
+            <button class="btn btn-outline btn-sm" onclick="removeTeacher('${t.id}', ${JSON.stringify(t.name).replace(/"/g,'&quot;')})">Remove</button>
+          </div>` : ''}
+        </div>`).join('') : `<div class="empty-state">No professors added yet.</div>`;
+    }
+
+    function resetForm() {
+      editingId = null;
+      document.getElementById('formTitle').textContent = 'Add a professor';
+      document.getElementById('saveBtn').textContent = 'Add';
+      document.getElementById('cancelBtn').style.display = 'none';
+      ['fName','fEmail','fPass','fTeaches','fPhone'].forEach(i=>document.getElementById(i).value='');
+      document.getElementById('fPass').placeholder = 'Set login password';
+      document.getElementById('msg').textContent = '';
+    }
+
+    function startEdit(t) {
+      editingId = t.id;
+      document.getElementById('formTitle').textContent = 'Edit professor';
+      document.getElementById('saveBtn').textContent = 'Save changes';
+      document.getElementById('cancelBtn').style.display = 'inline-block';
+      document.getElementById('fName').value = t.name || '';
+      document.getElementById('fEmail').value = t.email || '';
+      document.getElementById('fPass').value = '';
+      document.getElementById('fPass').placeholder = 'Leave blank to keep current';
+      document.getElementById('fDept').value = t.departmentId || '';
+      document.getElementById('fTeaches').value = t.teaches || '';
+      document.getElementById('fPhone').value = t.phone || '';
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    async function removeTeacher(id, name) {
+      if (!confirm(`Remove professor "${name}"?`)) return;
+      await api(`/users/${id}`, { method: 'DELETE' });
+      loadTeachers();
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('teachers');
+      isAdmin = user.role === 'admin';
+
+      const res = await api('/departments'); depts = res.departments;
+      if (isAdmin) {
+        document.getElementById('addCard').style.display = 'block';
+        document.getElementById('fDept').innerHTML = depts.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+        document.getElementById('cancelBtn').onclick = resetForm;
+        document.getElementById('saveBtn').onclick = async () => {
+          const msg = document.getElementById('msg');
+          const name = document.getElementById('fName').value.trim();
+          const email = document.getElementById('fEmail').value.trim();
+          const password = document.getElementById('fPass').value;
+          const departmentId = document.getElementById('fDept').value;
+          const teaches = document.getElementById('fTeaches').value.trim();
+          const phone = document.getElementById('fPhone').value.trim();
+          try {
+            if (editingId) {
+              await api(`/users/${editingId}`, { method: 'PUT', body: { name, email, departmentId, teaches, phone, ...(password ? { password } : {}) } });
+            } else {
+              if (!name || !email || !password) { msg.style.color='var(--danger)'; msg.textContent='Name, email and password are required.'; return; }
+              await api('/users', { method: 'POST', body: { name, email, password, role: 'teacher', departmentId, teaches, phone } });
+            }
+            resetForm();
+            loadTeachers();
+          } catch (e) { msg.style.color='var(--danger)'; msg.textContent = e.message; }
+        };
+      }
+      await loadTeachers();
+    })();
+  </script>
+</body>
+</html>

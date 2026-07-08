@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Calendar — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">Schedule</span>
+      <h1>Academic Calendar</h1>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+        <button class="btn btn-outline btn-sm" id="prevBtn">‹ Prev</button>
+        <div id="monthLabel" class="mono" style="font-weight:600"></div>
+        <button class="btn btn-outline btn-sm" id="nextBtn">Next ›</button>
+      </div>
+    </div>
+
+    <div class="cal-grid" id="calHead"></div>
+    <div class="cal-grid" id="calGrid" style="margin-top:6px"></div>
+
+    <div class="card" id="addEventCard" style="display:none;margin-top:24px">
+      <h3 style="font-size:15px;margin-bottom:12px" id="evtFormTitle">Add an event</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input type="text" id="evtTitle" placeholder="Event title" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+        <input type="date" id="evtDate" style="padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+        <input type="text" id="evtDesc" placeholder="Description (optional)" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+        <button class="btn btn-brass" id="addEvtBtn">Add event</button>
+        <button class="btn btn-outline" id="cancelEvtBtn" style="display:none">Cancel</button>
+      </div>
+    </div>
+
+    <div class="card" id="eventListCard" style="display:none;margin-top:18px">
+      <h3 style="font-size:15px;margin-bottom:12px">All events</h3>
+      <div id="eventList"></div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let cursor = new Date();
+    let allEvents = [];
+    let isStaff = false;
+    let editingEvtId = null;
+    const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    function renderEventList() {
+      if (!isStaff) return;
+      const list = document.getElementById('eventList');
+      const sorted = allEvents.slice().sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+      list.innerHTML = sorted.length ? sorted.map(e => `
+        <div class="resource-row">
+          <div><div class="r-title">${esc(e.title)}</div><div class="r-meta">${esc(e.date)}${e.description ? ' · ' + esc(e.description) : ''}</div></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick='startEditEvent(${JSON.stringify(e)})'>Edit</button>
+            <button class="btn btn-outline btn-sm" onclick="deleteEvent('${e.id}')">Remove</button>
+          </div>
+        </div>`).join('') : `<div class="empty-state">No events yet.</div>`;
+    }
+
+    function startEditEvent(e) {
+      editingEvtId = e.id;
+      document.getElementById('evtFormTitle').textContent = 'Edit event';
+      document.getElementById('addEvtBtn').textContent = 'Save changes';
+      document.getElementById('cancelEvtBtn').style.display = 'inline-block';
+      document.getElementById('evtTitle').value = e.title;
+      document.getElementById('evtDate').value = e.date;
+      document.getElementById('evtDesc').value = e.description || '';
+      window.scrollTo({top: document.getElementById('addEventCard').offsetTop - 20, behavior:'smooth'});
+    }
+
+    function resetEventForm() {
+      editingEvtId = null;
+      document.getElementById('evtFormTitle').textContent = 'Add an event';
+      document.getElementById('addEvtBtn').textContent = 'Add event';
+      document.getElementById('cancelEvtBtn').style.display = 'none';
+      document.getElementById('evtTitle').value = ''; document.getElementById('evtDate').value = ''; document.getElementById('evtDesc').value = '';
+    }
+
+    async function deleteEvent(id) {
+      if (!confirm('Remove this event?')) return;
+      await api('/events/' + id, { method: 'DELETE' });
+      if (editingEvtId === id) resetEventForm();
+      loadEvents();
+    }
+
+    function renderCalendar() {
+      const year = cursor.getFullYear(), month = cursor.getMonth();
+      document.getElementById('monthLabel').textContent = cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      document.getElementById('calHead').innerHTML = days.map(d => `<div class="cal-head">${d}</div>`).join('');
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+      let cells = '';
+      for (let i = 0; i < firstDay; i++) cells += `<div class="cal-cell" style="background:transparent;border:none"></div>`;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayEvents = allEvents.filter(e => e.date === dateStr);
+        cells += `<div class="cal-cell ${dateStr === todayStr ? 'today' : ''}">
+          <div class="cal-date">${d}</div>
+          ${dayEvents.map(e => `<div class="cal-evt" title="${e.description || ''}">${e.title}</div>`).join('')}
+        </div>`;
+      }
+      document.getElementById('calGrid').innerHTML = cells;
+    }
+
+    async function loadEvents() {
+      const { events } = await api('/events');
+      allEvents = events;
+      renderCalendar();
+      renderEventList();
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('calendar');
+      isStaff = user.role === 'teacher' || user.role === 'admin';
+      await loadEvents();
+
+      document.getElementById('prevBtn').onclick = () => { cursor.setMonth(cursor.getMonth() - 1); renderCalendar(); };
+      document.getElementById('nextBtn').onclick = () => { cursor.setMonth(cursor.getMonth() + 1); renderCalendar(); };
+
+      if (isStaff) {
+        document.getElementById('addEventCard').style.display = 'block';
+        document.getElementById('eventListCard').style.display = 'block';
+        document.getElementById('cancelEvtBtn').addEventListener('click', resetEventForm);
+        document.getElementById('addEvtBtn').addEventListener('click', async () => {
+          const title = document.getElementById('evtTitle').value.trim();
+          const date = document.getElementById('evtDate').value;
+          if (!title || !date) return;
+          const description = document.getElementById('evtDesc').value.trim();
+          if (editingEvtId) {
+            await api('/events/' + editingEvtId, { method: 'PUT', body: { title, date, description } });
+          } else {
+            await api('/events', { method: 'POST', body: { title, date, description } });
+          }
+          resetEventForm();
+          loadEvents();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

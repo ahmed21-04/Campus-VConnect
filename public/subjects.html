@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Subjects — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow" id="semTag">Semester</span>
+      <h1>Subjects</h1>
+      <div style="color:rgba(35,36,31,0.6);font-size:14px"><a id="backLink" href="/departments.html">← Back to semesters</a></div>
+    </div>
+
+    <div class="index-card-list" id="subjList"></div>
+
+    <div class="card" id="addSubjectCard" style="display:none;margin-top:20px">
+      <h3 style="font-size:15px;margin-bottom:12px">Add a subject to this semester</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input type="text" id="newSubjName" placeholder="Subject name" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+        <input type="text" id="newSubjDetails" placeholder="Details (optional)" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+        <button class="btn btn-brass" id="addSubjBtn">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const semId = params.get('sem');
+    const deptId = params.get('dept');
+    const num = params.get('num');
+    let isStaff = false;
+
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    async function loadSubjects() {
+      const { subjects } = await api(`/semesters/${semId}/subjects`);
+      const list = document.getElementById('subjList');
+      if (subjects.length === 0) {
+        list.innerHTML = `<div class="empty-state">No subjects added for this semester yet.</div>`;
+        return;
+      }
+      list.innerHTML = subjects.map(s => `
+        <div class="index-card" style="align-items:center">
+          <a href="/subject.html?id=${s.id}" style="flex:1;text-decoration:none;color:inherit;min-width:0">
+            <div class="subj-name">${esc(s.name)}</div>
+            <div class="subj-meta">${s.noteCount} notes · ${s.pyqCount} pyqs ${s.classLink ? '· class link added' : ''}${s.details ? ' · ' + esc(s.details) : ''}</div>
+          </a>
+          ${isStaff ? `<div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="editSubject('${s.id}', ${JSON.stringify(s.name).replace(/"/g,'&quot;')}, ${JSON.stringify(s.details||'').replace(/"/g,'&quot;')})">Edit</button>
+            <button class="btn btn-outline btn-sm" onclick="removeSubject('${s.id}', ${JSON.stringify(s.name).replace(/"/g,'&quot;')})">Remove</button>
+          </div>` : `<div class="chevron">›</div>`}
+        </div>
+      `).join('');
+    }
+
+    async function editSubject(id, name, details) {
+      const newName = prompt('Subject name:', name);
+      if (newName === null) return;
+      const newDetails = prompt('Subject details (optional):', details || '');
+      if (newDetails === null) return;
+      await api(`/subjects/${id}`, { method: 'PUT', body: { name: newName.trim(), details: newDetails } });
+      loadSubjects();
+    }
+    async function removeSubject(id, name) {
+      if (!confirm(`Remove the subject "${name}"? This also deletes its notes and PYQs.`)) return;
+      await api(`/subjects/${id}`, { method: 'DELETE' });
+      loadSubjects();
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('departments');
+      isStaff = user.role === 'teacher' || user.role === 'admin';
+      document.getElementById('semTag').textContent = `Semester ${num}`;
+      document.getElementById('backLink').href = `/semesters.html?dept=${deptId}`;
+      await loadSubjects();
+
+      if (isStaff) {
+        document.getElementById('addSubjectCard').style.display = 'block';
+        document.getElementById('addSubjBtn').addEventListener('click', async () => {
+          const name = document.getElementById('newSubjName').value.trim();
+          if (!name) return;
+          const details = document.getElementById('newSubjDetails').value.trim();
+          await api(`/semesters/${semId}/subjects`, { method: 'POST', body: { name, details } });
+          document.getElementById('newSubjName').value = '';
+          document.getElementById('newSubjDetails').value = '';
+          loadSubjects();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

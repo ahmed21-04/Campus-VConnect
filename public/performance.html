@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Performance — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">Records</span>
+      <h1>Academic &amp; Cultural Performance</h1>
+    </div>
+
+    <div id="studentView" style="display:none">
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:10px">Academic performance</h3>
+        <table>
+          <thead><tr><th>Subject</th><th>Exam</th><th>Marks</th></tr></thead>
+          <tbody id="perfRows"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:10px">Cultural achievements</h3>
+        <div id="culturalList"></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:10px">Teacher remarks</h3>
+        <div id="remarksList"></div>
+      </div>
+    </div>
+
+    <div id="staffView" style="display:none">
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:12px">Select a student</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <div class="field" style="margin:0"><label>Department</label><select id="deptSel"></select></div>
+          <div class="field" style="margin:0"><label>Student</label><select id="studentSel"></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:10px">Registered students <span id="studentCount" class="badge badge-present" style="margin-left:6px"></span></h3>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Semester</th></tr></thead>
+          <tbody id="studentListRows"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:12px">Add academic marks</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <div class="field" style="margin:0"><label>Semester</label><select id="semSel"></select></div>
+          <div class="field" style="margin:0"><label>Subject</label><select id="subjSel"></select></div>
+          <div class="field" style="margin:0"><label>Exam type</label><input type="text" id="examType" placeholder="e.g. Mid-term" style="width:140px"></div>
+          <div class="field" style="margin:0"><label>Marks</label><input type="number" id="marks" style="width:90px"></div>
+          <div class="field" style="margin:0"><label>Out of</label><input type="number" id="maxMarks" style="width:90px" value="100"></div>
+          <button class="btn btn-brass" id="addMarksBtn">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:12px">Add cultural achievement</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <input type="text" id="cultTitle" placeholder="Achievement title" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <input type="text" id="cultDesc" placeholder="Description" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <button class="btn btn-brass" id="addCultBtn">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:12px">Add a remark</h3>
+        <div style="display:flex;gap:10px">
+          <input type="text" id="remarkText" placeholder="Remark for this student" style="flex:1;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <button class="btn btn-brass" id="addRemarkBtn">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    async function loadStudentData() {
+      const [{ performance }, { culturals }, { remarks }] = await Promise.all([api('/performance'), api('/culturals'), api('/remarks')]);
+      const rows = [];
+      for (const p of performance) {
+        let subjName = p.subjectId;
+        try { const { subject } = await api(`/subjects/${p.subjectId}`); subjName = subject.name; } catch (e) {}
+        rows.push(`<tr><td>${subjName}</td><td>${p.examType}</td><td>${p.marks} / ${p.maxMarks}</td></tr>`);
+      }
+      document.getElementById('perfRows').innerHTML = rows.join('') || `<tr><td colspan="3" style="text-align:center;color:rgba(35,36,31,0.5)">No records yet</td></tr>`;
+      document.getElementById('culturalList').innerHTML = culturals.length ? culturals.map(c => `
+        <div class="resource-row"><div><div class="r-title">${c.title}</div><div class="r-meta">${c.date} ${c.description ? '· ' + c.description : ''}</div></div></div>
+      `).join('') : `<div class="empty-state">No cultural achievements recorded yet.</div>`;
+      document.getElementById('remarksList').innerHTML = remarks.length ? remarks.map(r => `
+        <div class="resource-row"><div><div class="r-title">${r.text}</div><div class="r-meta">${new Date(r.date).toLocaleDateString()}</div></div></div>
+      `).join('') : `<div class="empty-state">No remarks yet.</div>`;
+    }
+
+    async function cascadeDept() {
+      const { departments } = await api('/departments');
+      document.getElementById('deptSel').innerHTML = departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+      await loadStudents();
+      await cascadeSem();
+    }
+    const escP = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    async function loadStudents() {
+      const deptId = document.getElementById('deptSel').value;
+      const { students } = await api(`/students?departmentId=${deptId}`);
+      document.getElementById('studentSel').innerHTML = students.length ? students.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : `<option value="">No students yet</option>`;
+      const countEl = document.getElementById('studentCount');
+      if (countEl) countEl.textContent = students.length;
+      const rowsEl = document.getElementById('studentListRows');
+      if (rowsEl) rowsEl.innerHTML = students.length
+        ? students.map(s => `<tr><td>${escP(s.name)}</td><td>${escP(s.email)}</td><td>${s.semesterNumber||'—'}</td></tr>`).join('')
+        : `<tr><td colspan="3" style="text-align:center;color:rgba(35,36,31,0.5)">No students registered in this department</td></tr>`;
+    }
+    async function cascadeSem() {
+      const deptId = document.getElementById('deptSel').value;
+      const { semesters } = await api(`/departments/${deptId}/semesters`);
+      document.getElementById('semSel').innerHTML = semesters.map(s => `<option value="${s.id}">Semester ${s.number}</option>`).join('');
+      await cascadeSubj();
+    }
+    async function cascadeSubj() {
+      const semId = document.getElementById('semSel').value;
+      const { subjects } = await api(`/semesters/${semId}/subjects`);
+      document.getElementById('subjSel').innerHTML = subjects.length ? subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : `<option value="">No subjects yet</option>`;
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('performance');
+
+      if (user.role === 'student') {
+        document.getElementById('studentView').style.display = 'block';
+        await loadStudentData();
+      } else {
+        document.getElementById('staffView').style.display = 'block';
+        await cascadeDept();
+        document.getElementById('deptSel').addEventListener('change', async () => { await loadStudents(); await cascadeSem(); });
+        document.getElementById('semSel').addEventListener('change', cascadeSubj);
+
+        document.getElementById('addMarksBtn').addEventListener('click', async () => {
+          const studentId = document.getElementById('studentSel').value;
+          const subjectId = document.getElementById('subjSel').value;
+          const examType = document.getElementById('examType').value.trim();
+          const marks = Number(document.getElementById('marks').value);
+          const maxMarks = Number(document.getElementById('maxMarks').value);
+          if (!studentId || !subjectId || !examType) return;
+          await api('/performance', { method: 'POST', body: { studentId, subjectId, examType, marks, maxMarks } });
+          document.getElementById('examType').value = ''; document.getElementById('marks').value = '';
+        });
+
+        document.getElementById('addCultBtn').addEventListener('click', async () => {
+          const studentId = document.getElementById('studentSel').value;
+          const title = document.getElementById('cultTitle').value.trim();
+          if (!studentId || !title) return;
+          await api('/culturals', { method: 'POST', body: { studentId, title, description: document.getElementById('cultDesc').value.trim() } });
+          document.getElementById('cultTitle').value = ''; document.getElementById('cultDesc').value = '';
+        });
+
+        document.getElementById('addRemarkBtn').addEventListener('click', async () => {
+          const studentId = document.getElementById('studentSel').value;
+          const text = document.getElementById('remarkText').value.trim();
+          if (!studentId || !text) return;
+          await api('/remarks', { method: 'POST', body: { studentId, text } });
+          document.getElementById('remarkText').value = '';
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

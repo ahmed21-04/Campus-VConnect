@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Campus Connect — My Profile</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">My Profile</span>
+      <h1 id="profileName"></h1>
+      <div id="profileRoleSub" style="color:var(--muted);font-size:14px"></div>
+    </div>
+
+    <!-- Profile header card: details on the left, picture in the top-right corner -->
+    <div class="card profile-header-card">
+      <div class="profile-header-info" id="profileDetails"></div>
+      <div class="profile-corner-pic">
+        <div class="profile-pic-preview">
+          <div class="pic-initials" id="profilePicPreview">?</div>
+          <label class="pic-change-btn" for="profilePicInput" title="Change photo"><i class="fa-solid fa-camera"></i></label>
+        </div>
+        <input type="file" id="profilePicInput" accept="image/*" style="display:none">
+        <div id="profilePicMsg" style="font-size:12.5px;display:none;margin-top:8px;text-align:center;max-width:140px"></div>
+        <button class="btn btn-brass btn-sm" id="saveProfilePicBtn" style="margin-top:10px"><i class="fa-solid fa-cloud-arrow-up"></i> Save photo</button>
+      </div>
+    </div>
+
+    <!-- EDIT DETAILS -->
+    <div class="card">
+      <h3 style="margin-bottom:14px;font-size:16px"><i class="fa-solid fa-pen-to-square" style="color:var(--brass);margin-right:8px"></i>Edit my details</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <div class="field" style="margin:0"><label>Full name</label><input type="text" id="editName"></div>
+        <div class="field" style="margin:0"><label>Phone</label><input type="text" id="editPhone" placeholder="e.g. +91 98765 43210"></div>
+        <div class="field" style="margin:0" id="officeField"><label>Office / location</label><input type="text" id="editOffice"></div>
+        <button class="btn btn-brass" id="saveDetailsBtn">Save details</button>
+      </div>
+      <div id="detailsMsg" style="margin-top:10px;font-size:13px"></div>
+      <div id="roleNote" style="margin-top:6px;font-size:12.5px;color:var(--muted)"></div>
+    </div>
+
+    <!-- STUDENT PROFILE SECTION -->
+    <div id="studentProfile" style="display:none">
+      <div class="card">
+        <h3 style="margin-bottom:14px;font-size:16px"><i class="fa-solid fa-graduation-cap" style="color:var(--brass);margin-right:8px"></i>Student details</h3>
+        <table>
+          <tbody id="studentDetailRows"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px;font-size:16px"><i class="fa-solid fa-compass" style="color:var(--brass);margin-right:8px"></i>My shortcuts</h3>
+        <div class="plaque-grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">
+          <a class="plaque" href="/attendance.html"><div class="plaque-code"><i class="fa-solid fa-calendar-check"></i></div><h3 style="font-size:15px">My Attendance</h3></a>
+          <a class="plaque" href="/performance.html"><div class="plaque-code"><i class="fa-solid fa-chart-bar"></i></div><h3 style="font-size:15px">My Performance</h3></a>
+          <a class="plaque" href="/chat.html"><div class="plaque-code"><i class="fa-solid fa-comments"></i></div><h3 style="font-size:15px">Chat with Teachers</h3></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAFF / ADMIN PROFILE SECTION -->
+    <div id="staffProfile" style="display:none">
+      <div class="card">
+        <h3 style="margin-bottom:14px;font-size:16px"><i class="fa-solid fa-id-badge" style="color:var(--brass);margin-right:8px"></i><span id="staffDetailTitle">Staff details</span></h3>
+        <table>
+          <tbody id="staffDetailRows"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px;font-size:16px"><i class="fa-solid fa-compass" style="color:var(--brass);margin-right:8px"></i>Shortcuts</h3>
+        <div class="plaque-grid" id="staffShortcuts" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('');
+
+      document.getElementById('profileName').textContent = user.name;
+
+      // ---- profile picture (top-right corner) ----
+      const previewEl = document.getElementById('profilePicPreview');
+      const setPic = (src) => {
+        document.getElementById('profilePicPreview').outerHTML =
+          `<img id="profilePicPreview" src="${src}" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:3px solid var(--brass)">`;
+      };
+      if (user.profilePicture) setPic(user.profilePicture);
+      else previewEl.textContent = user.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+
+      document.getElementById('profilePicInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        try { setPic(await fileToDataUrl(file)); } catch(_) {}
+      });
+      document.getElementById('saveProfilePicBtn').addEventListener('click', async () => {
+        const file = document.getElementById('profilePicInput').files[0];
+        const msg = document.getElementById('profilePicMsg'); msg.style.display = 'block';
+        if (!file) { msg.style.color='var(--danger)'; msg.textContent='Click the camera icon to choose a photo first.'; return; }
+        try {
+          msg.style.color='var(--sage)'; msg.textContent='Uploading…';
+          await uploadProfilePicture(file);
+          msg.textContent = 'Saved!';
+          const navPic = document.getElementById('navPicWrap');
+          if (navPic && CURRENT_USER) navPic.innerHTML = profilePicHtml(CURRENT_USER, 34);
+        } catch(err) { msg.style.color='var(--danger)'; msg.textContent = err.message; }
+      });
+
+      // ---- department lookup ----
+      let deptName = '—';
+      try {
+        const { departments } = await api('/departments');
+        const d = departments.find(x => x.id === user.departmentId);
+        if (d) deptName = d.name;
+      } catch(_) {}
+
+      const row = (label, value) => `<tr><th style="width:180px">${label}</th><td>${value}</td></tr>`;
+
+      // ---- edit-details form ----
+      document.getElementById('editName').value = user.name || '';
+      document.getElementById('editPhone').value = user.phone || '';
+      document.getElementById('editOffice').value = user.office || '';
+      if (user.role === 'student') document.getElementById('officeField').style.display = 'none';
+      document.getElementById('roleNote').textContent = 'Your role (' + (user.role === 'admin' ? 'Administrator' : user.role.charAt(0).toUpperCase()+user.role.slice(1)) + ') is fixed and cannot be changed here.';
+      document.getElementById('saveDetailsBtn').addEventListener('click', async () => {
+        const msg = document.getElementById('detailsMsg');
+        const body = {
+          name: document.getElementById('editName').value.trim(),
+          phone: document.getElementById('editPhone').value.trim(),
+          office: document.getElementById('editOffice').value.trim()
+        };
+        if (!body.name) { msg.style.color='var(--danger)'; msg.textContent='Name cannot be empty.'; return; }
+        try {
+          const { user: updated } = await api('/auth/me', { method: 'PUT', body });
+          CURRENT_USER.name = updated.name; CURRENT_USER.phone = updated.phone; CURRENT_USER.office = updated.office;
+          msg.style.color='var(--sage)'; msg.textContent='Details saved.';
+          const nn = document.querySelector('.nav-name'); if (nn) nn.textContent = updated.name.split(' ')[0];
+          document.getElementById('profileName').textContent = updated.name;
+          setTimeout(() => location.reload(), 600);
+        } catch (e) { msg.style.color='var(--danger)'; msg.textContent = e.message; }
+      });
+
+      if (user.role === 'student') {
+        // ================= STUDENT SECTION =================
+        document.getElementById('studentProfile').style.display = 'block';
+        document.getElementById('profileRoleSub').innerHTML = `<span class="badge badge-present">Student</span> &nbsp;ID: <span class="mono">${user.id}</span>`;
+        document.getElementById('profileDetails').innerHTML = `
+          <h2 style="margin:0 0 6px;font-size:22px">${user.name}</h2>
+          <div style="color:var(--muted);font-size:14px;line-height:1.9">
+            <div><i class="fa-solid fa-envelope" style="color:var(--brass);width:18px"></i> ${user.email}</div>
+            <div><i class="fa-solid fa-building-columns" style="color:var(--brass);width:18px"></i> ${deptName}</div>
+            <div><i class="fa-solid fa-layer-group" style="color:var(--brass);width:18px"></i> Semester ${user.semesterNumber || '—'}</div>
+          </div>`;
+        document.getElementById('studentDetailRows').innerHTML =
+          row('User ID', `<span class="mono">${user.id}</span>`) +
+          row('Full name', user.name) +
+          row('Email', user.email) +
+          row('Department', deptName) +
+          row('Current semester', user.semesterNumber || '—') +
+          row('Phone', user.phone || '—') +
+          row('Role', 'Student');
+      } else {
+        // ================= STAFF / ADMIN SECTION =================
+        const isAdmin = user.role === 'admin';
+        document.getElementById('staffProfile').style.display = 'block';
+        document.getElementById('staffDetailTitle').textContent = isAdmin ? 'Administrator details' : 'Faculty details';
+        document.getElementById('profileRoleSub').innerHTML = `<span class="badge badge-present">${isAdmin ? 'Administrator' : 'Faculty'}</span> &nbsp;ID: <span class="mono">${user.id}</span>`;
+        document.getElementById('profileDetails').innerHTML = `
+          <h2 style="margin:0 0 6px;font-size:22px">${user.name}</h2>
+          <div style="color:var(--muted);font-size:14px;line-height:1.9">
+            <div><i class="fa-solid fa-envelope" style="color:var(--brass);width:18px"></i> ${user.email}</div>
+            <div><i class="fa-solid fa-user-shield" style="color:var(--brass);width:18px"></i> ${isAdmin ? 'Administrator' : 'Teacher'}</div>
+            ${!isAdmin ? `<div><i class="fa-solid fa-building-columns" style="color:var(--brass);width:18px"></i> ${deptName}</div>` : ''}
+          </div>`;
+        document.getElementById('staffDetailRows').innerHTML =
+          row('User ID', `<span class="mono">${user.id}</span>`) +
+          row('Full name', user.name) +
+          row('Email', user.email) +
+          (!isAdmin ? row('Department', deptName) : '') +
+          row('Phone', user.phone || '—') +
+          row('Office / location', user.office || '—') +
+          row('Role', isAdmin ? 'Administrator' : 'Teacher');
+
+        const shortcuts = [
+          {href:'/attendance.html',  icon:'fa-calendar-check', label:'Mark Attendance'},
+          {href:'/performance.html', icon:'fa-chart-bar',      label:'Enter Grades'},
+          {href:'/chat.html',        icon:'fa-comments',       label:'Student Chat'},
+        ];
+        if (isAdmin) shortcuts.push({href:'/admin.html', icon:'fa-screwdriver-wrench', label:'Admin Panel'});
+        document.getElementById('staffShortcuts').innerHTML = shortcuts.map(s => `
+          <a class="plaque" href="${s.href}"><div class="plaque-code"><i class="fa-solid ${s.icon}"></i></div><h3 style="font-size:15px">${s.label}</h3></a>`).join('');
+      }
+    })();
+  </script>
+</body>
+</html>

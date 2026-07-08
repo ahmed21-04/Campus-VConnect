@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Attendance — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">Records</span>
+      <h1>Attendance</h1>
+    </div>
+
+    <div id="studentView" style="display:none">
+      <div class="stat-row" id="attStats"></div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Status</th></tr></thead>
+          <tbody id="attRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="staffView" style="display:none">
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:12px">Mark attendance</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <div class="field" style="margin:0"><label>Department</label><select id="deptSel"></select></div>
+          <div class="field" style="margin:0"><label>Semester</label><select id="semSel"></select></div>
+          <div class="field" style="margin:0"><label>Subject</label><select id="subjSel"></select></div>
+          <div class="field" style="margin:0"><label>Student</label><select id="studentSel"></select></div>
+          <div class="field" style="margin:0"><label>Date</label><input type="date" id="attDate"></div>
+          <div class="field" style="margin:0"><label>Status</label>
+            <select id="statusSel"><option value="present">Present</option><option value="absent">Absent</option></select>
+          </div>
+          <button class="btn btn-brass" id="markBtn">Mark</button>
+        </div>
+        <div id="markMsg" style="margin-top:10px;font-size:13px;color:var(--sage)"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:12px">Review &amp; correct attendance</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 10px">Shows the selected student's records. Fix a mistake with the toggle button, or remove a wrong entry.</p>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" id="loadRecordsBtn"><i class="fa-solid fa-rotate"></i> Load records</button>
+          <span id="recordsMsg" style="font-size:13px;color:var(--muted)"></span>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Status</th><th style="text-align:right">Actions</th></tr></thead>
+          <tbody id="recordRows"><tr><td colspan="4" style="text-align:center;color:rgba(35,36,31,0.5)">Select a student and click "Load records"</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:10px">Registered students <span id="studentCount" class="badge badge-present" style="margin-left:6px"></span></h3>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Semester</th></tr></thead>
+          <tbody id="studentListRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    async function cascadeDept() {
+      const { departments } = await api('/departments');
+      document.getElementById('deptSel').innerHTML = departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+      await cascadeSem();
+      await loadStudents();
+    }
+    async function cascadeSem() {
+      const deptId = document.getElementById('deptSel').value;
+      const { semesters } = await api(`/departments/${deptId}/semesters`);
+      document.getElementById('semSel').innerHTML = semesters.map(s => `<option value="${s.id}">Semester ${s.number}</option>`).join('');
+      await cascadeSubj();
+    }
+    async function cascadeSubj() {
+      const semId = document.getElementById('semSel').value;
+      const { subjects } = await api(`/semesters/${semId}/subjects`);
+      document.getElementById('subjSel').innerHTML = subjects.length ? subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : `<option value="">No subjects yet</option>`;
+    }
+    const escA = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    async function loadStudents() {
+      const deptId = document.getElementById('deptSel').value;
+      const { students } = await api(`/students?departmentId=${deptId}`);
+      document.getElementById('studentSel').innerHTML = students.length ? students.map(s => `<option value="${s.id}">${s.name}</option>`).join('') : `<option value="">No students yet</option>`;
+      const countEl = document.getElementById('studentCount');
+      if (countEl) countEl.textContent = students.length;
+      const rowsEl = document.getElementById('studentListRows');
+      if (rowsEl) rowsEl.innerHTML = students.length
+        ? students.map(s => `<tr><td>${escA(s.name)}</td><td>${escA(s.email)}</td><td>${s.semesterNumber||'—'}</td></tr>`).join('')
+        : `<tr><td colspan="3" style="text-align:center;color:rgba(35,36,31,0.5)">No students registered in this department</td></tr>`;
+    }
+
+    async function loadStudentAttendance() {
+      const { attendance } = await api('/attendance');
+      const present = attendance.filter(a => a.status === 'present').length;
+      const pct = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
+      document.getElementById('attStats').innerHTML = `
+        <div class="stat-box"><div class="stat-num">${pct}%</div><div class="stat-label">Overall attendance</div></div>
+        <div class="stat-box"><div class="stat-num">${attendance.length}</div><div class="stat-label">Classes recorded</div></div>
+        <div class="stat-box"><div class="stat-num">${present}</div><div class="stat-label">Present</div></div>
+      `;
+      const subjMap = {};
+      for (const a of attendance) { subjMap[a.subjectId] = subjMap[a.subjectId] || a.subjectId; }
+      const rows = [];
+      for (const a of attendance.slice().reverse()) {
+        let subjName = a.subjectId;
+        try { const { subject } = await api(`/subjects/${a.subjectId}`); subjName = subject.name; } catch (e) {}
+        rows.push(`<tr><td>${a.date}</td><td>${subjName}</td><td><span class="badge badge-${a.status}">${a.status}</span></td></tr>`);
+      }
+      document.getElementById('attRows').innerHTML = rows.join('') || `<tr><td colspan="3" style="text-align:center;color:rgba(35,36,31,0.5)">No attendance recorded yet</td></tr>`;
+    }
+
+    // ---- Staff: review & correct attendance ----
+    const subjNameCache = {};
+    async function subjName(id) {
+      if (!subjNameCache[id]) {
+        try { const { subject } = await api(`/subjects/${id}`); subjNameCache[id] = subject.name; }
+        catch (e) { subjNameCache[id] = id; }
+      }
+      return subjNameCache[id];
+    }
+
+    async function loadStudentRecords() {
+      const studentId = document.getElementById('studentSel').value;
+      const rows = document.getElementById('recordRows');
+      const msg = document.getElementById('recordsMsg');
+      if (!studentId) { msg.textContent = 'Select a student first.'; return; }
+      msg.textContent = 'Loading…';
+      const { attendance } = await api(`/attendance?studentId=${studentId}`);
+      msg.textContent = attendance.length ? `${attendance.length} record(s)` : '';
+      if (!attendance.length) {
+        rows.innerHTML = `<tr><td colspan="4" style="text-align:center;color:rgba(35,36,31,0.5)">No attendance recorded for this student yet</td></tr>`;
+        return;
+      }
+      const html = [];
+      for (const a of attendance.slice().sort((x, y) => y.date.localeCompare(x.date))) {
+        const name = await subjName(a.subjectId);
+        const next = a.status === 'present' ? 'absent' : 'present';
+        html.push(`<tr>
+          <td>${a.date}</td>
+          <td>${escA(name)}</td>
+          <td><span class="badge badge-${a.status}">${a.status}</span></td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn btn-outline btn-sm" onclick="fixRecord('${a.id}','${next}')">Change to ${next}</button>
+            <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="removeRecord('${a.id}')">Remove</button>
+          </td>
+        </tr>`);
+      }
+      rows.innerHTML = html.join('');
+    }
+
+    async function fixRecord(id, status) {
+      await api(`/attendance/${id}`, { method: 'PUT', body: { status } });
+      loadStudentRecords();
+    }
+    async function removeRecord(id) {
+      if (!confirm('Remove this attendance record?')) return;
+      await api(`/attendance/${id}`, { method: 'DELETE' });
+      loadStudentRecords();
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('attendance');
+
+      if (user.role === 'student') {
+        document.getElementById('studentView').style.display = 'block';
+        await loadStudentAttendance();
+      } else {
+        document.getElementById('staffView').style.display = 'block';
+        await cascadeDept();
+        document.getElementById('deptSel').addEventListener('change', async () => { await cascadeSem(); await loadStudents(); });
+        document.getElementById('semSel').addEventListener('change', cascadeSubj);
+        document.getElementById('attDate').valueAsDate = new Date();
+
+        document.getElementById('markBtn').addEventListener('click', async () => {
+          const subjectId = document.getElementById('subjSel').value;
+          const studentId = document.getElementById('studentSel').value;
+          const date = document.getElementById('attDate').value;
+          const status = document.getElementById('statusSel').value;
+          const msg = document.getElementById('markMsg');
+          if (!subjectId || !studentId || !date) { msg.textContent = 'Please complete all fields.'; msg.style.color = 'var(--danger)'; return; }
+          const r = await api('/attendance', { method: 'POST', body: { subjectId, studentId, date, status } });
+          msg.textContent = r.updated ? 'Already marked for that date — record updated instead.' : 'Attendance recorded.';
+          msg.style.color = 'var(--sage)';
+          loadStudentRecords();
+        });
+
+        document.getElementById('loadRecordsBtn').addEventListener('click', loadStudentRecords);
+        document.getElementById('studentSel').addEventListener('change', loadStudentRecords);
+      }
+    })();
+  </script>
+</body>
+</html>

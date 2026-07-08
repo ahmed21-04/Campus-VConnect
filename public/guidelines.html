@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Guidelines — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">College info</span>
+      <h1>Guidelines &amp; Curriculum Info</h1>
+    </div>
+    <div id="guideList"></div>
+
+    <div class="card" id="addGuideCard" style="display:none;margin-top:20px">
+      <h3 style="font-size:15px;margin-bottom:12px" id="gdFormTitle">Add a guideline (admin only)</h3>
+      <div class="field"><label>Title</label><input type="text" id="gdTitle"></div>
+      <div class="field"><label>Details</label><textarea id="gdBody" rows="3"></textarea></div>
+      <button class="btn btn-brass" id="addGdBtn">Publish</button>
+      <button class="btn btn-outline" id="cancelGdBtn" style="display:none">Cancel</button>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let isAdmin = false;
+    let editingGdId = null;
+    const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    async function loadGuidelines() {
+      const { guidelines } = await api('/guidelines');
+      document.getElementById('guideList').innerHTML = guidelines.map(g => `
+        <div class="card guide-card">
+          <h3 style="font-size:16px;margin-bottom:6px">${esc(g.title)}</h3>
+          <div style="font-size:14px;color:rgba(35,36,31,0.75)">${esc(g.body)}</div>
+          ${isAdmin ? `<div style="margin-top:10px;display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick='startEditGuide(${JSON.stringify(g)})'>Edit</button>
+            <button class="btn btn-outline btn-sm" onclick="deleteGuide('${g.id}')">Delete</button>
+          </div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function startEditGuide(g) {
+      editingGdId = g.id;
+      document.getElementById('gdFormTitle').textContent = 'Edit guideline';
+      document.getElementById('addGdBtn').textContent = 'Save changes';
+      document.getElementById('cancelGdBtn').style.display = 'inline-block';
+      document.getElementById('gdTitle').value = g.title;
+      document.getElementById('gdBody').value = g.body;
+      window.scrollTo({top: document.getElementById('addGuideCard').offsetTop - 20, behavior:'smooth'});
+    }
+
+    function resetGuideForm() {
+      editingGdId = null;
+      document.getElementById('gdFormTitle').textContent = 'Add a guideline (admin only)';
+      document.getElementById('addGdBtn').textContent = 'Publish';
+      document.getElementById('cancelGdBtn').style.display = 'none';
+      document.getElementById('gdTitle').value = ''; document.getElementById('gdBody').value = '';
+    }
+
+    async function deleteGuide(id) {
+      if (!confirm('Delete this guideline?')) return;
+      await api('/guidelines/' + id, { method: 'DELETE' });
+      if (editingGdId === id) resetGuideForm();
+      loadGuidelines();
+    }
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('guidelines');
+      isAdmin = user.role === 'admin';
+      await loadGuidelines();
+      if (isAdmin) {
+        document.getElementById('addGuideCard').style.display = 'block';
+        document.getElementById('cancelGdBtn').addEventListener('click', resetGuideForm);
+        document.getElementById('addGdBtn').addEventListener('click', async () => {
+          const title = document.getElementById('gdTitle').value.trim();
+          const body = document.getElementById('gdBody').value.trim();
+          if (!title || !body) return;
+          if (editingGdId) {
+            await api('/guidelines/' + editingGdId, { method: 'PUT', body: { title, body } });
+          } else {
+            await api('/guidelines', { method: 'POST', body: { title, body } });
+          }
+          resetGuideForm();
+          loadGuidelines();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">Management</span>
+      <h1>Admin &amp; Faculty Panel</h1>
+      <div style="color:rgba(35,36,31,0.6);font-size:14px">Content is managed inline across the site — this page is your map to where everything lives.</div>
+    </div>
+
+    <div class="plaque-grid">
+      <a class="plaque" href="/students.html"><div class="plaque-code">→</div><h3 style="font-size:15px">Manage students</h3><div class="plaque-meta">Add, edit &amp; remove students</div></a>
+      <a class="plaque" href="/teachers.html"><div class="plaque-code">→</div><h3 style="font-size:15px">Manage professors</h3><div class="plaque-meta">Faculty &amp; the classes they teach</div></a>
+      <a class="plaque" href="/departments.html"><div class="plaque-code">→</div><h3 style="font-size:15px">Manage subjects, notes, PYQs &amp; class links</h3><div class="plaque-meta">Departments → Semester → Subject</div></a>
+      <a class="plaque" href="/attendance.html"><div class="plaque-code">→</div><h3 style="font-size:15px">Mark attendance</h3><div class="plaque-meta">Attendance page</div></a>
+      <a class="plaque" href="/performance.html"><div class="plaque-code">→</div><h3 style="font-size:15px">Enter marks, cultural achievements &amp; remarks</h3><div class="plaque-meta">Performance page</div></a>
+      <a class="plaque" href="/calendar.html"><div class="plaque-code">→</div><h3 style="font-size:15px">Manage academic calendar events</h3><div class="plaque-meta">Calendar page</div></a>
+      <a class="plaque" href="/guidelines.html"><div class="plaque-code">→</div><h3 style="font-size:15px">Publish &amp; edit college guidelines</h3><div class="plaque-meta">Guidelines page (admin only)</div></a>
+    </div>
+
+    <div class="card" style="margin-top:24px">
+      <h3 style="font-size:15px;margin-bottom:8px">Roadmap for what to add next</h3>
+      <div style="font-size:13.5px;color:rgba(35,36,31,0.7);line-height:1.7">
+        This build covers the core structure end-to-end. Natural next additions: file uploads for notes/PYQs instead of links, a real class-scheduling timetable, push notifications for new events, an analytics dashboard for attendance trends, and richer avatar customization.
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      if (user.role === 'student') { window.location.href = '/dashboard.html'; return; }
+      renderNav('admin');
+    })();
+  </script>
+</body>
+</html>

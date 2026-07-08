@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Subject — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow">Subject</span>
+      <h1 id="subjName">Loading…</h1>
+      <div id="subjDetails" style="color:rgba(35,36,31,0.7);font-size:14px;margin-top:4px"></div>
+      <div>
+        <a id="classLinkBtn" class="btn btn-brass btn-sm" href="#" target="_blank" style="display:none;margin-top:8px">▶ Join class on YouTube</a>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="notes">Notes</button>
+      <button class="tab-btn" data-tab="pyqs">Previous Year Questions</button>
+      <button class="tab-btn" data-tab="manage" id="manageTabBtn" style="display:none">Manage</button>
+    </div>
+
+    <div id="tab-notes">
+      <div id="notesList"></div>
+    </div>
+    <div id="tab-pyqs" style="display:none">
+      <div id="pyqsList"></div>
+    </div>
+    <div id="tab-manage" style="display:none">
+      <div class="card">
+        <h3 style="font-size:15px">Subject name &amp; details</h3>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <input type="text" id="subjNameInput" placeholder="Subject name" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <input type="text" id="subjDetailsInput" placeholder="Details (optional)" style="flex:1;min-width:180px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <button class="btn btn-brass" id="saveSubjBtn">Save</button>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-outline btn-sm" id="deleteSubjBtn" style="color:var(--danger);border-color:var(--danger)">Delete this subject</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px">Class link (YouTube)</h3>
+        <div style="display:flex;gap:10px;margin-top:10px">
+          <input type="url" id="classLinkInput" placeholder="https://youtube.com/..." style="flex:1;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <button class="btn btn-brass" id="saveClassLinkBtn">Save</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px">Add a note / class notes</h3>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <input type="text" id="noteTitle" placeholder="Note title" style="flex:1;min-width:160px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <input type="url" id="noteUrl" placeholder="Link (optional if uploading a file)" style="flex:1;min-width:160px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <button class="btn btn-brass" id="addNoteBtn">Add</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <label for="noteFile" class="btn btn-outline btn-sm" style="cursor:pointer"><i class="fa-solid fa-paperclip"></i> Upload PDF / file from device</label>
+          <input type="file" id="noteFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" style="display:none">
+          <span id="noteFileName" style="font-size:13px;color:var(--muted)">No file chosen</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px">Add a previous year question paper</h3>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <input type="text" id="pyqYear" placeholder="Year (e.g. 2024)" style="width:160px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <input type="url" id="pyqUrl" placeholder="Link (optional if uploading a file)" style="flex:1;min-width:160px;padding:10px 12px;border-radius:7px;border:1.5px solid var(--line)">
+          <button class="btn btn-brass" id="addPyqBtn">Add</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <label for="pyqFile" class="btn btn-outline btn-sm" style="cursor:pointer"><i class="fa-solid fa-paperclip"></i> Upload PDF / file from device</label>
+          <input type="file" id="pyqFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" style="display:none">
+          <span id="pyqFileName" style="font-size:13px;color:var(--muted)">No file chosen</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    const subjectId = new URLSearchParams(location.search).get('id');
+    let isStaff = false;
+
+    function ytEmbed(url) {
+      const m = url.match(/(?:v=|youtu\.be\/|embed\/)([\w-]{6,})/);
+      return m ? m[1] : null;
+    }
+
+    async function loadSubject() {
+      const { subject } = await api(`/subjects/${subjectId}`);
+      document.getElementById('subjName').textContent = subject.name;
+      document.getElementById('subjDetails').textContent = subject.details || '';
+      document.getElementById('subjNameInput').value = subject.name || '';
+      document.getElementById('subjDetailsInput').value = subject.details || '';
+      const classBtn = document.getElementById('classLinkBtn');
+      if (subject.classLink) {
+        classBtn.style.display = 'inline-flex';
+        classBtn.href = subject.classLink;
+      } else {
+        classBtn.style.display = 'none';
+      }
+      document.getElementById('classLinkInput').value = subject.classLink || '';
+
+      const resourceLink = (item, fallback) => {
+        if (!item.url) return 'No link or file attached';
+        const label = item.fileName ? `<i class="fa-solid fa-file-pdf"></i> ${item.fileName}` : fallback;
+        return `<a href="${item.url}" target="_blank">${label}</a>`;
+      };
+
+      const notesList = document.getElementById('notesList');
+      notesList.innerHTML = subject.notes.length ? subject.notes.map(n => `
+        <div class="resource-row">
+          <div><div class="r-title">${n.title}</div><div class="r-meta">${resourceLink(n, 'Open resource')}</div></div>
+          ${isStaff ? `<button class="btn btn-outline btn-sm" onclick="deleteNote('${n.id}')">Remove</button>` : ''}
+        </div>`).join('') : `<div class="empty-state">No notes uploaded yet.</div>`;
+
+      const pyqsList = document.getElementById('pyqsList');
+      pyqsList.innerHTML = subject.pyqs.length ? subject.pyqs.map(p => `
+        <div class="resource-row">
+          <div><div class="r-title">${p.year}</div><div class="r-meta">${resourceLink(p, 'Open paper')}</div></div>
+          ${isStaff ? `<button class="btn btn-outline btn-sm" onclick="deletePyq('${p.id}')">Remove</button>` : ''}
+        </div>`).join('') : `<div class="empty-state">No previous year papers uploaded yet.</div>`;
+    }
+
+    async function deleteNote(id) { await api(`/subjects/${subjectId}/notes/${id}`, { method: 'DELETE' }); loadSubject(); }
+    async function deletePyq(id) { await api(`/subjects/${subjectId}/pyqs/${id}`, { method: 'DELETE' }); loadSubject(); }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ['notes', 'pyqs', 'manage'].forEach(t => document.getElementById('tab-' + t).style.display = t === btn.dataset.tab ? 'block' : 'none');
+      });
+    });
+
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('departments');
+      isStaff = user.role === 'teacher' || user.role === 'admin';
+      if (isStaff) document.getElementById('manageTabBtn').style.display = 'inline-block';
+      await loadSubject();
+
+      document.getElementById('saveSubjBtn').addEventListener('click', async () => {
+        const name = document.getElementById('subjNameInput').value.trim();
+        if (!name) return;
+        await api(`/subjects/${subjectId}`, { method: 'PUT', body: { name, details: document.getElementById('subjDetailsInput').value.trim() } });
+        loadSubject();
+      });
+      document.getElementById('deleteSubjBtn').addEventListener('click', async () => {
+        if (!confirm('Delete this subject along with its notes and PYQs?')) return;
+        await api(`/subjects/${subjectId}`, { method: 'DELETE' });
+        if (history.length > 1) history.back(); else window.location.href = '/departments.html';
+      });
+      document.getElementById('saveClassLinkBtn').addEventListener('click', async () => {
+        await api(`/subjects/${subjectId}/class-link`, { method: 'PUT', body: { classLink: document.getElementById('classLinkInput').value } });
+        loadSubject();
+      });
+      // File pickers — show chosen file name
+      const MAX_UPLOAD = 25 * 1024 * 1024;
+      const wireFilePicker = (inputId, labelId) => {
+        document.getElementById(inputId).addEventListener('change', e => {
+          const f = e.target.files[0];
+          document.getElementById(labelId).textContent = f ? `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)` : 'No file chosen';
+        });
+      };
+      wireFilePicker('noteFile', 'noteFileName');
+      wireFilePicker('pyqFile', 'pyqFileName');
+
+      const attachFile = async (inputId, body) => {
+        const file = document.getElementById(inputId).files[0];
+        if (!file) return true;
+        if (file.size > MAX_UPLOAD) { alert('File too large (max 25 MB).'); return false; }
+        body.fileName = file.name;
+        body.fileData = await fileToDataUrl(file);
+        return true;
+      };
+      const clearFile = (inputId, labelId) => {
+        document.getElementById(inputId).value = '';
+        document.getElementById(labelId).textContent = 'No file chosen';
+      };
+
+      document.getElementById('addNoteBtn').addEventListener('click', async () => {
+        const title = document.getElementById('noteTitle').value.trim();
+        if (!title) { alert('Please enter a note title.'); return; }
+        const body = { title, url: document.getElementById('noteUrl').value.trim() };
+        if (!(await attachFile('noteFile', body))) return;
+        try {
+          await api(`/subjects/${subjectId}/notes`, { method: 'POST', body });
+        } catch (e) { alert(e.message); return; }
+        document.getElementById('noteTitle').value = ''; document.getElementById('noteUrl').value = '';
+        clearFile('noteFile', 'noteFileName');
+        loadSubject();
+      });
+      document.getElementById('addPyqBtn').addEventListener('click', async () => {
+        const year = document.getElementById('pyqYear').value.trim();
+        if (!year) { alert('Please enter the year.'); return; }
+        const body = { year, url: document.getElementById('pyqUrl').value.trim() };
+        if (!(await attachFile('pyqFile', body))) return;
+        try {
+          await api(`/subjects/${subjectId}/pyqs`, { method: 'POST', body });
+        } catch (e) { alert(e.message); return; }
+        document.getElementById('pyqYear').value = ''; document.getElementById('pyqUrl').value = '';
+        clearFile('pyqFile', 'pyqFileName');
+        loadSubject();
+      });
+    })();
+  </script>
+</body>
+</html>

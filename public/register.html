@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campus Connect — Create account</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="auth-page">
+
+    <!-- Left visual panel -->
+    <div class="auth-visual">
+      <img src="https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=900&auto=format&fit=crop&q=80" alt="Students on campus">
+      <div class="auth-visual-overlay">
+        <div class="auth-visual-badges">
+          <span class="auth-badge"><i class="fa-solid fa-book-open"></i> &nbsp;Resources</span>
+          <span class="auth-badge"><i class="fa-solid fa-chart-bar"></i> &nbsp;Grades</span>
+          <span class="auth-badge"><i class="fa-solid fa-calendar-check"></i> &nbsp;Attendance</span>
+        </div>
+        <h2>Join Campus Connect</h2>
+        <p>Create your account in under a minute and get instant access to your attendance records, academic calendar, subject notes, and performance reports.</p>
+      </div>
+    </div>
+
+    <!-- Right form panel -->
+    <div class="auth-form-side">
+      <div class="auth-card">
+        <div class="seal">CC</div>
+        <div class="auth-title">Create your account</div>
+        <div class="auth-sub">Join Campus Connect</div>
+
+        <div id="errorBox" class="error-banner" style="display:none"></div>
+
+        <form id="regForm">
+          <!-- Profile picture upload -->
+          <div class="field">
+            <label><i class="fa-solid fa-camera" style="margin-right:6px;color:var(--brass)"></i>Profile picture <span style="font-weight:400;color:rgba(35,36,31,0.45)">(optional)</span></label>
+            <div class="profile-pic-wrap">
+              <div class="profile-pic-preview">
+                <div class="pic-initials" id="regPicPreview">?</div>
+                <label class="pic-change-btn" for="profilePicInput" title="Choose photo"><i class="fa-solid fa-camera"></i></label>
+              </div>
+              <div class="profile-pic-info">
+                <p>Choose a photo from your device. JPG or PNG, under 1.5 MB.</p>
+                <input type="file" id="profilePicInput" accept="image/*" style="font-size:13px;width:100%">
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label><i class="fa-solid fa-user" style="margin-right:6px;color:var(--brass)"></i>Full name</label>
+            <input type="text" id="name" required placeholder="Your name">
+          </div>
+          <div class="field">
+            <label><i class="fa-solid fa-envelope" style="margin-right:6px;color:var(--brass)"></i>Email</label>
+            <input type="email" id="email" required placeholder="you@campus.edu">
+          </div>
+          <div class="field">
+            <label><i class="fa-solid fa-lock" style="margin-right:6px;color:var(--brass)"></i>Password</label>
+            <input type="password" id="password" required minlength="6" placeholder="At least 6 characters">
+          </div>
+          <div class="field">
+            <label><i class="fa-solid fa-id-badge" style="margin-right:6px;color:var(--brass)"></i>I am a</label>
+            <select id="role">
+              <option value="student">Student</option>
+              <option value="teacher">Teacher</option>
+            </select>
+          </div>
+          <div class="field">
+            <label><i class="fa-solid fa-building-columns" style="margin-right:6px;color:var(--brass)"></i>Department</label>
+            <select id="department"></select>
+          </div>
+          <div class="field" id="semesterField">
+            <label><i class="fa-solid fa-layer-group" style="margin-right:6px;color:var(--brass)"></i>Current semester</label>
+            <select id="semesterNumber">
+              <option>1</option><option>2</option><option>3</option><option>4</option>
+              <option>5</option><option>6</option><option>7</option><option>8</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-user-plus"></i> Create account</button>
+        </form>
+
+        <div class="auth-switch">Already have an account? <a href="/login.html">Log in</a></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    // Preview picture before upload
+    document.getElementById('profilePicInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        const preview = document.getElementById('regPicPreview');
+        preview.outerHTML = `<img id="regPicPreview" src="${dataUrl}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid var(--brass)">`;
+      } catch (_) {}
+    });
+
+    (async () => {
+      const { departments } = await api('/departments');
+      const sel = document.getElementById('department');
+      sel.innerHTML = departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    })();
+
+    document.getElementById('role').addEventListener('change', (e) => {
+      document.getElementById('semesterField').style.display = e.target.value === 'student' ? 'block' : 'none';
+    });
+
+    document.getElementById('regForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('errorBox');
+      errorBox.style.display = 'none';
+      try {
+        await api('/auth/register', {
+          method: 'POST',
+          body: {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            role: document.getElementById('role').value,
+            departmentId: document.getElementById('department').value,
+            semesterNumber: Number(document.getElementById('semesterNumber').value)
+          }
+        });
+        // Upload profile picture if one was chosen
+        const file = document.getElementById('profilePicInput').files[0];
+        if (file) {
+          try { await uploadProfilePicture(file); } catch (_) {}
+        }
+        window.location.href = '/dashboard.html';
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

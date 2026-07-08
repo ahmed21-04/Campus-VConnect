@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Semesters — Campus Connect</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <span class="eyebrow"><i class="fa-solid fa-layer-group"></i> &nbsp;Semesters</span>
+      <h1 id="deptName">Semesters</h1>
+      <div style="color:rgba(15,23,42,0.55);font-size:14px" id="backRow">
+        <a href="/departments.html"><i class="fa-solid fa-arrow-left" style="margin-right:6px"></i>All departments</a>
+      </div>
+    </div>
+    <div class="sem-grid" id="semGrid"></div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      const user = await requireAuth();
+      if (!user) return;
+      renderNav('departments');
+
+      const params = new URLSearchParams(location.search);
+      let deptId = params.get('dept');
+
+      // Students are locked to their own department only
+      if (user.role === 'student') {
+        if (!deptId || deptId !== user.departmentId) {
+          // Redirect to their correct department
+          deptId = user.departmentId;
+          history.replaceState(null, '', `/semesters.html?dept=${deptId}`);
+        }
+        document.getElementById('backRow').style.display = 'none';
+      }
+
+      const { departments } = await api('/departments');
+      const dept = departments.find(d => d.id === deptId);
+      document.getElementById('deptName').textContent = dept ? dept.name : 'Semesters';
+
+      const { semesters } = await api(`/departments/${deptId}/semesters`);
+
+      // Students highlight their current semester
+      document.getElementById('semGrid').innerHTML = semesters.map(s => {
+        const isCurrent = user.role === 'student' && s.number === user.semesterNumber;
+        return `
+          <a class="sem-card" href="/subjects.html?sem=${s.id}&dept=${deptId}&num=${s.number}"
+             style="${isCurrent ? 'border:2px solid var(--brass);background:var(--parchment-2);' : ''}">
+            <div class="sem-num">${s.number}</div>
+            <div class="sem-label">Semester${isCurrent ? ' <span style="color:var(--brass);font-size:10px;font-weight:600">● Current</span>' : ''}</div>
+            <div class="sem-count">${s.subjectCount} subjects</div>
+          </a>`;
+      }).join('');
+    })();
+  </script>
+</body>
+</html>
